@@ -1,0 +1,1427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>AI</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --border: #1e1e1e;
+    --accent: #00ff88;
+    --accent-dim: #00ff8822;
+    --text: #e8e8e8;
+    --text-dim: #555;
+    --user-bg: #161616;
+    --ai-bg: #0f0f0f;
+    --danger: #ff4444;
+    --warn: #ffaa00;
+    --offline: #aa88ff;
+    --offline-dim: #aa88ff22;
+    /* Provider colors */
+    --gemini-color: #00ff88; --gemini-dim: #00ff8822;
+    --groq-color:   #ff6b35; --groq-dim:   #ff6b3522;
+    --ollama-color: #aa88ff; --ollama-dim: #aa88ff22;
+    --provider-color: #00ff88; --provider-dim: #00ff8822;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  #header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    flex-shrink: 0;
+  }
+
+  #header h1 { font-size: 18px; font-weight: 800; letter-spacing: -0.5px; color: var(--provider-color); }
+
+
+  #key-label {
+    color: var(--text-dim);
+    font-size: 10px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  #header-right { display: flex; gap: 10px; align-items: center; }
+
+  .icon-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    width: 34px; height: 34px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+    transition: all 0.15s;
+  }
+  .icon-btn:active { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
+
+  /* Mode badge in header */
+  #mode-badge {
+    font-size: 9px;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    letter-spacing: 1px;
+    padding: 3px 8px;
+    border-radius: 20px;
+    border: 1px solid var(--provider-color);
+    color: var(--provider-color);
+    text-transform: uppercase;
+    transition: all 0.2s;
+  }
+
+
+  #api-banner {
+    background: #1a1000;
+    border-bottom: 1px solid #ff990033;
+    padding: 10px 16px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  #api-banner input {
+    flex: 1;
+    background: #0a0a0a;
+    border: 1px solid #ff990055;
+    color: #ffaa00;
+    padding: 7px 10px;
+    border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    outline: none;
+  }
+  #api-banner button {
+    background: #ffaa00;
+    color: #000;
+    border: none;
+    padding: 7px 14px;
+    border-radius: 6px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  #key-toast {
+    position: fixed;
+    top: 60px; left: 50%;
+    transform: translateX(-50%) translateY(-10px);
+    background: #1a1a00;
+    border: 1px solid var(--warn);
+    color: var(--warn);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s, transform 0.3s;
+    z-index: 300;
+    white-space: nowrap;
+  }
+  #key-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  #messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 0;
+    scroll-behavior: smooth;
+  }
+  #messages::-webkit-scrollbar { width: 3px; }
+  #messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .msg {
+    padding: 8px 14px;
+    display: flex; flex-direction: column; gap: 5px;
+    animation: fadeIn 0.2s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+
+  .msg-label { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; }
+
+  /* User message — right-aligned bubble */
+  .msg.user {
+    align-items: flex-end;
+    padding-right: 14px;
+  }
+  .msg.user .msg-label { color: var(--text-dim); }
+  .msg.user .msg-content {
+    background: #1e1e1e;
+    border: 1px solid #2a2a2a;
+    border-radius: 18px 18px 4px 18px;
+    padding: 10px 14px;
+    max-width: 86%;
+    word-break: break-word;
+  }
+
+  /* AI message — left-aligned, Claude-card style */
+  .msg.ai {
+    align-items: flex-start;
+    padding-left: 14px;
+  }
+  .msg.ai .msg-label { color: var(--provider-color); }
+  .msg.ai .msg-content {
+    background: #111;
+    border: 1px solid #1e1e1e;
+    border-radius: 4px 18px 18px 18px;
+    padding: 12px 14px;
+    max-width: 94%;
+    word-break: break-word;
+  }
+
+  .msg-content {
+    font-size: 14px; line-height: 1.65;
+    font-family: 'JetBrains Mono', monospace;
+    white-space: pre-wrap;
+  }
+  .msg-content pre {
+    display: none; /* hidden by default, shown when expanded */
+    background: #0d0d0d; border: 1px solid var(--border);
+    border-radius: 0 0 10px 10px; margin: 0; overflow-x: auto; position: relative;
+    max-height: 360px;
+  }
+  .msg-content pre.expanded { display: block; }
+  .msg-content pre code { font-family: 'JetBrains Mono', monospace; font-size: 12px; padding: 12px; display: block; }
+
+  /* Artifact card — collapsed view */
+  .code-card {
+    background: #161616;
+    border: 1px solid #2a2a2a;
+    border-radius: 10px;
+    margin: 8px 0;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .code-card:active { border-color: #444; }
+  .code-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+  }
+  .code-card-icon {
+    width: 36px; height: 36px;
+    background: #222;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    color: #888;
+    flex-shrink: 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+  }
+  .code-card-info { flex: 1; min-width: 0; }
+  .code-card-title {
+    font-size: 13px; font-weight: 700;
+    color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-family: 'Syne', sans-serif;
+  }
+  .code-card-meta {
+    font-size: 10px; color: #555;
+    font-family: 'JetBrains Mono', monospace;
+    margin-top: 1px;
+  }
+  .code-card-chevron {
+    font-size: 11px; color: #444;
+    flex-shrink: 0;
+    transition: transform 0.2s;
+  }
+  .code-card.open .code-card-chevron { transform: rotate(180deg); }
+  .code-card.open { border-color: #333; }
+  .code-card.open .code-card-header { border-bottom: 1px solid #222; }
+
+  /* copy btn inside expanded pre */
+  .copy-code-btn {
+    position: absolute; top: 6px; right: 6px;
+    background: #1e1e1e; border: 1px solid #333; color: #888;
+    padding: 3px 8px; border-radius: 4px; font-size: 10px;
+    cursor: pointer; font-family: 'Syne', sans-serif; z-index: 2;
+  }
+  .copy-code-btn:active { background: var(--accent-dim); color: var(--accent); }
+  .copy-code-btn.copied { color: var(--accent); border-color: var(--accent); background: var(--accent-dim); }
+
+  .msg-content p { margin: 4px 0; }
+  .msg-content strong { color: var(--provider-color); font-weight: 700; }
+  .msg-content em { color: #aaa; }
+  .msg-content ul, .msg-content ol { padding-left: 18px; margin: 4px 0; }
+  .msg-content li { margin: 2px 0; }
+  .msg-content h1,.msg-content h2,.msg-content h3 { color: var(--provider-color); margin: 8px 0 4px; font-size: 14px; }
+  .msg-content code:not(pre code) {
+    background: #1a1a1a; border: 1px solid #2a2a2a;
+    padding: 1px 5px; border-radius: 4px; font-size: 12px; color: #ffcc66;
+  }
+  .msg-image {
+    max-width: 220px; max-height: 180px; border-radius: 8px;
+    border: 1px solid var(--border); object-fit: cover; display: block; margin-bottom: 4px;
+  }
+
+  .thinking { display: flex; gap: 4px; align-items: center; padding: 4px 0; }
+  .thinking span {
+    width: 6px; height: 6px; background: var(--provider-color);
+    border-radius: 50%; animation: pulse 1s infinite; opacity: 0.4;
+  }
+  body.offline-mode .thinking span { background: var(--ollama-color); }
+  .thinking span:nth-child(2) { animation-delay: 0.2s; }
+  .thinking span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes pulse { 0%,100%{opacity:0.2;transform:scale(0.8)} 50%{opacity:1;transform:scale(1)} }
+
+  #empty {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    height: 100%; gap: 8px; color: var(--text-dim); font-size: 13px; text-align: center; padding: 20px;
+  }
+  #empty .big { font-size: 36px; }
+  #empty strong { color: #333; font-size: 15px; }
+
+  #image-preview-bar { display: none; padding: 6px 16px 2px; background: var(--bg); flex-shrink: 0; }
+  #image-preview-bar.has-image { display: flex; align-items: center; gap: 8px; }
+  #preview-thumb { width: 44px; height: 44px; object-fit: cover; border-radius: 10px; border: 1px solid var(--border); }
+  #remove-image-btn {
+    background: #1e1e1e; border: 1px solid #333; color: #888;
+    width: 22px; height: 22px; border-radius: 50%; cursor: pointer; font-size: 12px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #image-preview-bar span { font-size: 11px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
+
+  /* ── Claude-style input area ── */
+  #input-area {
+    background: var(--bg);
+    padding: 10px 12px 14px;
+    flex-shrink: 0;
+  }
+  #input-wrapper {
+    display: flex;
+    flex-direction: column;
+    background: #1c1c1c;
+    border: 1px solid #2a2a2a;
+    border-radius: 18px;
+    overflow: hidden;
+    transition: border-color 0.15s;
+  }
+  #input-wrapper:focus-within {
+    border-color: #3a3a3a;
+  }
+  #input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    padding: 12px 16px 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    resize: none;
+    outline: none;
+    min-height: 44px;
+    max-height: 140px;
+    line-height: 1.5;
+  }
+  #input::placeholder { color: #444; }
+
+  /* Pasted content card inside input wrapper */
+  #paste-card {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    margin: 10px 12px 0;
+    background: #1a1a1a;
+    border: 1px solid #2e2e2e;
+    border-radius: 10px;
+    padding: 9px 11px;
+  }
+  #paste-card.visible { display: flex; }
+  #paste-card-icon {
+    width: 34px; height: 34px;
+    background: #252525;
+    border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700; color: #777;
+    font-family: 'JetBrains Mono', monospace;
+    flex-shrink: 0;
+  }
+  #paste-card-info { flex: 1; min-width: 0; }
+  #paste-card-title { font-size: 12px; font-weight: 700; color: #ccc; font-family: 'Syne', sans-serif; }
+  #paste-card-meta { font-size: 10px; color: #555; font-family: 'JetBrains Mono', monospace; margin-top: 1px; }
+  #paste-remove {
+    background: #2a2a2a; border: 1px solid #333; color: #666;
+    width: 22px; height: 22px; border-radius: 50%;
+    cursor: pointer; font-size: 13px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  #paste-remove:active { color: #fff; border-color: #555; }
+
+  #input-bottom-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 8px 8px;
+  }
+
+  .attach-btn {
+    background: none;
+    border: none;
+    color: #555;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+    transition: all 0.15s;
+  }
+  .attach-btn:active { color: var(--provider-color); }
+  .attach-btn.has-image { color: var(--accent); }
+
+  #send-btn {
+    background: var(--provider-color);
+    border: none;
+    color: #000;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+    transition: opacity 0.15s, background 0.2s;
+    font-weight: 700;
+  }
+  #send-btn:disabled { opacity: 0.25; cursor: not-allowed; }
+  #send-btn:active:not(:disabled) { opacity: 0.75; }
+
+  /* Stop button when loading */
+  #send-btn.stop {
+    background: #333;
+    color: var(--text);
+    font-size: 12px;
+  }
+
+  /* Camera */
+  #camera-modal {
+    display: none; position: fixed; inset: 0; background: #000; z-index: 200;
+    flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+  }
+  #camera-modal.open { display: flex; }
+  #camera-video { width: 100%; max-width: 480px; border-radius: 12px; background: #111; }
+  #camera-canvas { display: none; }
+  .camera-controls { display: flex; gap: 16px; }
+  .cam-btn { padding: 12px 24px; border-radius: 10px; border: none; font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px; cursor: pointer; }
+  #snap-btn { background: var(--accent); color: #000; }
+  #cancel-cam-btn { background: #222; color: var(--text); }
+  #cam-switch-btn { background: #222; color: var(--text); font-size: 18px; padding: 12px 16px; }
+  #cam-error { color: #ff6666; font-size: 13px; font-family: 'JetBrains Mono', monospace; text-align: center; padding: 0 20px; }
+
+  /* Settings */
+  #settings-overlay {
+    display: none; position: fixed; inset: 0; background: #000000cc;
+    z-index: 100; align-items: flex-end; overflow-y: auto;
+  }
+  #settings-overlay.open { display: flex; }
+  #settings-panel {
+    background: #111; border-top: 1px solid var(--border);
+    border-radius: 20px 20px 0 0; padding: 20px 16px 30px; width: 100%;
+    display: flex; flex-direction: column; gap: 14px;
+    animation: slideUp 0.25s ease; max-height: 90dvh; overflow-y: auto;
+  }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: none; } }
+  #settings-panel h2 { font-size: 16px; font-weight: 800; color: var(--provider-color); }
+  .setting-row { display: flex; flex-direction: column; gap: 6px; }
+  .setting-row label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+  .setting-row input, .setting-row textarea, .setting-row select {
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); padding: 9px 12px; border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; outline: none; width: 100%;
+  }
+  .setting-row textarea { resize: vertical; min-height: 70px; }
+  .save-btn {
+    background: var(--accent); color: #000; border: none; padding: 12px;
+    border-radius: 10px; font-family: 'Syne', sans-serif;
+    font-weight: 800; font-size: 14px; cursor: pointer; width: 100%;
+  }
+
+  /* Mode toggle */
+  .mode-toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 14px;
+  }
+  .mode-toggle-info { display: flex; flex-direction: column; gap: 2px; }
+  .mode-toggle-info span { font-size: 13px; font-weight: 700; }
+  .mode-toggle-info small { font-size: 10px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
+  .toggle-switch {
+    width: 48px; height: 26px; background: #222; border-radius: 13px;
+    border: 1px solid #333; position: relative; cursor: pointer;
+    transition: background 0.2s, border-color 0.2s; flex-shrink: 0;
+  }
+  .toggle-switch.on { background: var(--offline-dim); border-color: var(--offline); }
+  .toggle-switch::after {
+    content: ''; position: absolute; top: 3px; left: 3px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: #555; transition: transform 0.2s, background 0.2s;
+  }
+  .toggle-switch.on::after { transform: translateX(22px); background: var(--offline); }
+
+  /* Ollama settings section */
+  #ollama-section { display: none; flex-direction: column; gap: 10px; }
+  #ollama-section.visible { display: flex; }
+
+  /* Key slots */
+  #online-section { display: flex; flex-direction: column; gap: 10px; }
+  #online-section.hidden { display: none; }
+
+  .keys-section-title { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }
+  .keys-note { font-size: 10px; color: #383838; font-family: 'JetBrains Mono', monospace; margin-bottom: 6px; }
+  .key-slot { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .key-slot-num { font-size: 10px; font-family: 'JetBrains Mono', monospace; color: var(--text-dim); width: 18px; flex-shrink: 0; text-align: right; }
+  .key-slot input {
+    flex: 1; background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); padding: 7px 10px; border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; outline: none;
+  }
+  .key-slot input:focus { border-color: var(--accent); }
+  .key-slot input.is-active { border-color: var(--accent); }
+  .key-slot input.is-exhausted { border-color: var(--danger); opacity: 0.5; }
+  .key-slot-status { font-size: 9px; font-family: 'JetBrains Mono', monospace; width: 22px; text-align: center; flex-shrink: 0; }
+  .reset-keys-btn {
+    background: none; border: 1px solid #333; color: var(--text-dim);
+    padding: 6px 10px; border-radius: 6px; font-family: 'Syne', sans-serif;
+    font-size: 11px; cursor: pointer; width: 100%;
+  }
+  .reset-keys-btn:active { border-color: var(--accent); color: var(--accent); }
+
+  .section-divider { border: none; border-top: 1px solid var(--border); margin: 2px 0; }
+
+  /* Provider selector tabs */
+  .provider-tabs { display: flex; gap: 6px; }
+  .provider-tab {
+    flex: 1; padding: 8px 4px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text-dim); font-family: 'Syne', sans-serif;
+    font-size: 11px; font-weight: 700; cursor: pointer; text-align: center;
+    transition: all 0.15s; letter-spacing: 0.5px;
+  }
+  .provider-tab.active-gemini { border-color: var(--gemini-color); color: var(--gemini-color); background: var(--gemini-dim); }
+  .provider-tab.active-groq   { border-color: var(--groq-color);   color: var(--groq-color);   background: var(--groq-dim); }
+  .provider-tab.active-ollama { border-color: var(--ollama-color); color: var(--ollama-color); background: var(--ollama-dim); }
+
+  #groq-section { display: none; flex-direction: column; gap: 10px; }
+  #groq-section.visible { display: flex; }
+
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1>⚡ AI</h1>
+  <span id="mode-badge">ONLINE</span>
+  <div id="header-right">
+    <span id="key-label"></span>
+    <button class="icon-btn" onclick="clearChat()" title="Clear">🗑</button>
+    <button class="icon-btn" onclick="openSettings()" title="Settings">⚙️</button>
+  </div>
+</div>
+
+<div id="key-toast">🔄 <span id="toast-num">key #2</span></div>
+
+<div id="api-banner" style="display:none">
+  <input type="password" id="banner-key" placeholder="Paste API key..." />
+  <button onclick="saveBannerKey()">Save</button>
+</div>
+
+<div id="messages">
+  <div id="empty">
+    <div class="big">⚡</div>
+    <strong>Direct answers. No fluff.</strong>
+    <span>Ask anything. Code, math, logic, or share an image.</span>
+  </div>
+</div>
+
+<div id="image-preview-bar">
+  <img id="preview-thumb" src="" alt="preview" />
+  <span>Image attached</span>
+  <button id="remove-image-btn" onclick="removeImage()" title="Remove">✕</button>
+</div>
+
+<div id="input-area">
+  <input type="file" id="file-input" accept="image/*" style="display:none" onchange="handleFileSelect(event)" />
+  <div id="input-wrapper">
+    <div id="paste-card">
+      <div id="paste-card-icon">TXT</div>
+      <div id="paste-card-info">
+        <div id="paste-card-title">Pasted content</div>
+        <div id="paste-card-meta">0 lines</div>
+      </div>
+      <button id="paste-remove" onclick="clearPaste()">✕</button>
+    </div>
+    <textarea id="input" placeholder="Chat with AI..." rows="1"></textarea>
+    <div id="input-bottom-row">
+      <button class="attach-btn" id="attach-btn" onclick="showAttachOptions()" title="Attach image">＋</button>
+      <button id="send-btn" onclick="sendMessage()">↑</button>
+    </div>
+  </div>
+</div>
+
+<div id="camera-modal">
+  <video id="camera-video" autoplay playsinline></video>
+  <canvas id="camera-canvas"></canvas>
+  <div id="cam-error"></div>
+  <div class="camera-controls">
+    <button class="cam-btn" id="cam-switch-btn" onclick="switchCamera()">🔄</button>
+    <button class="cam-btn" id="snap-btn" onclick="snapPhoto()">📸 Capture</button>
+    <button class="cam-btn" id="cancel-cam-btn" onclick="closeCamera()">Cancel</button>
+  </div>
+</div>
+
+<div id="attach-overlay" style="display:none; position:fixed; inset:0; background:#000000bb; z-index:150; align-items:flex-end;" onclick="closeAttachOutside(event)">
+  <div style="background:#111; border-top:1px solid var(--border); border-radius:20px 20px 0 0; padding:20px 16px 32px; width:100%; display:flex; flex-direction:column; gap:10px; animation: slideUp 0.2s ease;">
+    <div style="font-size:12px; color:var(--text-dim); text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">Attach Image</div>
+    <button onclick="openCamera()" style="background:var(--surface); border:1px solid var(--border); color:var(--text); padding:14px; border-radius:10px; font-family:'Syne',sans-serif; font-size:14px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:10px;">📷 <span>Take Photo</span></button>
+    <button onclick="openFilePicker()" style="background:var(--surface); border:1px solid var(--border); color:var(--text); padding:14px; border-radius:10px; font-family:'Syne',sans-serif; font-size:14px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:10px;">🖼️ <span>Choose from Gallery</span></button>
+    <button onclick="closeAttachOptions()" style="background:none; border:none; color:var(--text-dim); padding:10px; font-family:'Syne',sans-serif; font-size:13px; cursor:pointer;">Cancel</button>
+  </div>
+</div>
+
+<div id="settings-overlay" onclick="closeSettingsOutside(event)">
+  <div id="settings-panel">
+    <h2>⚙️ Settings</h2>
+
+    <!-- Provider selector -->
+    <div class="setting-row">
+      <label>Provider</label>
+      <div class="provider-tabs">
+        <button class="provider-tab" id="tab-gemini" onclick="setProvider('gemini')">⚡ Gemini</button>
+        <button class="provider-tab" id="tab-groq"   onclick="setProvider('groq')">🔥 Groq</button>
+        <button class="provider-tab" id="tab-ollama" onclick="setProvider('ollama')">📴 Ollama</button>
+      </div>
+    </div>
+
+    <hr class="section-divider">
+
+    <!-- Online section -->
+    <div id="online-section">
+      <div class="setting-row">
+        <div class="keys-section-title" id="keys-section-title">Gemini API Keys (up to 10)</div>
+        <div class="keys-note">On rate limit, auto-switches to next available key →</div>
+        <div id="key-slots"></div>
+        <button class="reset-keys-btn" onclick="resetExhausted()">↺ Reset exhausted keys</button>
+      </div>
+      <div class="setting-row">
+        <label>Model</label>
+        <select id="s-model">
+          <option value="gemini-2.5-flash">gemini-2.5-flash (1M ctx, fast ✅)</option>
+          <option value="gemini-2.5-pro">gemini-2.5-pro (1M ctx, smartest)</option>
+          <option value="gemini-2.0-flash">gemini-2.0-flash (1M ctx)</option>
+          <option value="gemini-1.5-pro">gemini-1.5-pro (2M ctx, max)</option>
+          <option value="gemini-1.5-flash">gemini-1.5-flash (1M ctx)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Groq section -->
+    <div id="groq-section">
+      <div class="setting-row">
+        <div class="keys-section-title">Groq API Keys (up to 10)</div>
+        <div class="keys-note">Free tier: 14,400 req/day — get key at console.groq.com →</div>
+        <div id="groq-key-slots"></div>
+        <button class="reset-keys-btn" onclick="resetGroqExhausted()">↺ Reset exhausted keys</button>
+      </div>
+      <div class="setting-row">
+        <label>Model</label>
+        <select id="s-groq-model">
+          <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile (128k ctx ✅)</option>
+          <option value="llama-3.1-8b-instant">llama-3.1-8b-instant (128k ctx, fast ⚡)</option>
+          <option value="llama-4-scout-17b-16e-instruct">llama-4-scout-17b-16e-instruct (512k ctx, max)</option>
+          <option value="llama-4-maverick-17b-128e-instruct">llama-4-maverick-17b-128e-instruct (128k ctx)</option>
+          <option value="deepseek-r1-distill-llama-70b">deepseek-r1-distill-llama-70b (128k ctx)</option>
+          <option value="moonshotai/kimi-k2-instruct">kimi-k2-instruct (131k ctx)</option>
+          <option value="mixtral-8x7b-32768">mixtral-8x7b-32768 (32k ctx)</option>
+          <option value="gemma2-9b-it">gemma2-9b-it (8k ctx)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Offline / Ollama section -->
+    <div id="ollama-section">
+      <div class="setting-row">
+        <label>Ollama Host</label>
+        <input type="text" id="s-ollama-host" placeholder="http://localhost:11434" />
+      </div>
+      <div class="setting-row">
+        <label>Model Name</label>
+        <input type="text" id="s-ollama-model" placeholder="dolphin3" />
+      </div>
+    </div>
+
+    <hr class="section-divider">
+
+    <div class="setting-row">
+      <label>System Prompt (optional)</label>
+      <textarea id="s-system" placeholder="You are a helpful assistant."></textarea>
+    </div>
+    <button class="save-btn" onclick="saveSettings()">Save</button>
+  </div>
+</div>
+
+<script>
+const MAX_KEYS = 10;
+
+// Provider color map
+const PROVIDER_COLORS = {
+  gemini: { color: '#00ff88', dim: '#00ff8822', label: 'GEMINI' },
+  groq:   { color: '#ff6b35', dim: '#ff6b3522', label: 'GROQ'   },
+  ollama: { color: '#aa88ff', dim: '#aa88ff22', label: 'OLLAMA' }
+};
+
+// ── State ──────────────────────────────────────────────────
+let provider     = localStorage.getItem('ai_provider') || 'gemini'; // 'gemini'|'groq'|'ollama'
+let mode         = provider === 'ollama' ? 'offline' : 'online';
+let model        = localStorage.getItem('gemini_model')  || 'gemini-2.5-flash';
+let groqModel    = localStorage.getItem('groq_model')    || 'llama-3.3-70b-versatile';
+let ollamaHost   = localStorage.getItem('ollama_host')   || 'http://localhost:11434';
+let ollamaModel  = localStorage.getItem('ollama_model')  || 'dolphin3';
+let systemPrompt = localStorage.getItem('gemini_system') || 'You are a helpful and direct AI assistant. Answer clearly and concisely. IMPORTANT: Always wrap ALL code, scripts, or file contents inside fenced code blocks using triple backticks with the language name (e.g. ```html, ```python, ```javascript). Never output raw code outside of code blocks.';
+
+let apiKeys      = loadKeys('gemini_keys', 'gemini_key');
+let groqKeys     = loadKeys('groq_keys', null);
+let activeKeyIndex     = parseInt(localStorage.getItem('gemini_active_key') || '0');
+let activeGroqKeyIndex = parseInt(localStorage.getItem('groq_active_key')   || '0');
+
+let history = [];
+let isLoading = false;
+let abortController = null;
+let pendingImageBase64 = null;
+let pendingImageMime   = null;
+let cameraStream = null;
+let facingMode = 'environment';
+
+// ── Key Management ─────────────────────────────────────────
+function loadKeys(storageKey, legacyKey) {
+  try { const s = localStorage.getItem(storageKey); if (s) return JSON.parse(s); } catch(e) {}
+  if (legacyKey) { const legacy = localStorage.getItem(legacyKey); if (legacy) return [{ key: legacy, exhausted: false }]; }
+  return [];
+}
+function saveKeys() {
+  localStorage.setItem('gemini_keys', JSON.stringify(apiKeys));
+  localStorage.setItem('gemini_active_key', String(activeKeyIndex));
+  localStorage.setItem('groq_keys', JSON.stringify(groqKeys));
+  localStorage.setItem('groq_active_key', String(activeGroqKeyIndex));
+}
+function getActiveKey() {
+  const keys = provider === 'groq' ? groqKeys : apiKeys;
+  const idx  = provider === 'groq' ? activeGroqKeyIndex : activeKeyIndex;
+  if (!keys.length) return null;
+  const k = keys[idx < keys.length ? idx : 0];
+  return (k && k.key && !k.exhausted) ? k.key : null;
+}
+function switchToNextKey() {
+  const keys = provider === 'groq' ? groqKeys : apiKeys;
+  let idx    = provider === 'groq' ? activeGroqKeyIndex : activeKeyIndex;
+  const start = idx;
+  for (let i = 1; i <= keys.length; i++) {
+    const ni = (start + i) % keys.length;
+    if (keys[ni] && keys[ni].key && !keys[ni].exhausted) {
+      if (provider === 'groq') activeGroqKeyIndex = ni;
+      else activeKeyIndex = ni;
+      saveKeys(); return true;
+    }
+  }
+  return false;
+}
+function markCurrentKeyExhausted() {
+  if (provider === 'groq') { if (groqKeys[activeGroqKeyIndex]) { groqKeys[activeGroqKeyIndex].exhausted = true; saveKeys(); } }
+  else { if (apiKeys[activeKeyIndex]) { apiKeys[activeKeyIndex].exhausted = true; saveKeys(); } }
+}
+function resetExhausted() {
+  apiKeys.forEach(k => k.exhausted = false);
+  saveKeys(); renderKeySlots(); updateKeyIndicator();
+}
+function resetGroqExhausted() {
+  groqKeys.forEach(k => k.exhausted = false);
+  saveKeys(); renderGroqKeySlots(); updateKeyIndicator();
+}
+function updateKeyIndicator() {
+  const label = document.getElementById('key-label');
+  const pc = PROVIDER_COLORS[provider];
+  if (provider === 'ollama') { label.textContent = ollamaModel || 'dolphin3'; label.style.color = pc.color; return; }
+  const keys = provider === 'groq' ? groqKeys : apiKeys;
+  const idx  = provider === 'groq' ? activeGroqKeyIndex : activeKeyIndex;
+  const total = keys.filter(k => k.key).length;
+  if (!total) { label.textContent = 'NO KEY'; label.style.color = 'var(--danger)'; return; }
+  const exhausted = keys.filter(k => k.key && k.exhausted).length;
+  label.style.color = exhausted === total ? 'var(--danger)' : pc.color;
+  label.textContent = `KEY ${idx + 1}/${total}`;
+}
+function showKeyToast(newIdx) {
+  const toast = document.getElementById('key-toast');
+  document.getElementById('toast-num').textContent = newIdx + 1;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2500);
+}
+
+// ── Provider ───────────────────────────────────────────────
+function setProvider(p) {
+  provider = p;
+  mode = p === 'ollama' ? 'offline' : 'online';
+  localStorage.setItem('ai_provider', p);
+  localStorage.setItem('ai_mode', mode);
+  applyMode();
+  updateProviderUI();
+}
+
+function applyMode() {
+  const isOffline = provider === 'ollama';
+  document.body.classList.toggle('offline-mode', isOffline);
+  const pc = PROVIDER_COLORS[provider];
+  // Update CSS variable
+  document.documentElement.style.setProperty('--provider-color', pc.color);
+  document.documentElement.style.setProperty('--provider-dim',   pc.dim);
+  document.getElementById('mode-badge').textContent = pc.label;
+  // Sync send button color
+  const sendBtn = document.getElementById('send-btn');
+  if (sendBtn && !sendBtn.classList.contains('stop')) {
+    sendBtn.style.background = pc.color;
+  }
+  // Banner
+  if (!isOffline && !getActiveKey()) document.getElementById('api-banner').style.display = 'flex';
+  else document.getElementById('api-banner').style.display = 'none';
+  updateKeyIndicator();
+}
+
+function updateProviderUI() {
+  // Tab highlight
+  ['gemini','groq','ollama'].forEach(p => {
+    const tab = document.getElementById('tab-' + p);
+    tab.className = 'provider-tab' + (provider === p ? ' active-' + p : '');
+  });
+  // Sections
+  document.getElementById('online-section').classList.toggle('hidden', provider !== 'gemini');
+  document.getElementById('groq-section').classList.toggle('visible',  provider === 'groq');
+  document.getElementById('ollama-section').classList.toggle('visible', provider === 'ollama');
+}
+
+// ── Paste content card state ───────────────────────────────
+let pastedContent = null; // stores the pasted long text separately
+
+function clearPaste() {
+  pastedContent = null;
+  document.getElementById('paste-card').classList.remove('visible');
+}
+
+// ── Init ───────────────────────────────────────────────────
+function init() {
+  applyMode();
+  updateProviderUI();
+  const input = document.getElementById('input');
+
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  });
+
+  input.addEventListener('input', () => {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+  });
+
+  // Intercept paste — if long (>300 chars or >5 lines), show card instead
+  input.addEventListener('paste', e => {
+    const pasted = (e.clipboardData || window.clipboardData).getData('text');
+    if (!pasted) return;
+    const lines = pasted.split('\n').length;
+    const isLong = pasted.length > 300 || lines > 5;
+    if (isLong) {
+      e.preventDefault();
+      pastedContent = pasted;
+      const lineCount = lines;
+      const charCount = pasted.length;
+      // Detect if it looks like code
+      const looksLikeCode = /[{}<>();\[\]]/.test(pasted) || /^\s*(function|const|let|var|import|export|class|def |<\w)/.test(pasted);
+      document.getElementById('paste-card-icon').textContent = looksLikeCode ? '</>' : 'TXT';
+      document.getElementById('paste-card-title').textContent = looksLikeCode ? 'Pasted code' : 'Pasted content';
+      document.getElementById('paste-card-meta').textContent = `${lineCount} lines · ${charCount} chars`;
+      document.getElementById('paste-card').classList.add('visible');
+    }
+  });
+}
+
+// ── Banner ─────────────────────────────────────────────────
+function saveBannerKey() {
+  const k = document.getElementById('banner-key').value.trim();
+  if (!k) return;
+  if (provider === 'groq') {
+    if (!groqKeys.length) groqKeys.push({ key: k, exhausted: false });
+    else groqKeys[0] = { key: k, exhausted: false };
+    activeGroqKeyIndex = 0;
+  } else {
+    if (!apiKeys.length) apiKeys.push({ key: k, exhausted: false });
+    else apiKeys[0] = { key: k, exhausted: false };
+    activeKeyIndex = 0;
+  }
+  saveKeys();
+  document.getElementById('api-banner').style.display = 'none';
+  updateKeyIndicator();
+}
+
+// ── Settings ───────────────────────────────────────────────
+function _renderKeySlots(containerId, keys, activeIdx, accentColor) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  for (let i = 0; i < MAX_KEYS; i++) {
+    const slot = keys[i] || { key: '', exhausted: false };
+    const isActive = i === activeIdx && slot.key;
+    const isExhausted = slot.exhausted && slot.key;
+    const row = document.createElement('div'); row.className = 'key-slot';
+    const num = document.createElement('span'); num.className = 'key-slot-num'; num.textContent = `${i+1}.`;
+    const inp = document.createElement('input');
+    inp.type = 'password';
+    inp.placeholder = i === 0 ? 'Primary key (required)' : `Key ${i+1} (optional)`;
+    inp.value = slot.key || ''; inp.dataset.index = i;
+    if (isActive)   { inp.classList.add('is-active');    inp.style.borderColor = accentColor; }
+    if (isExhausted) inp.classList.add('is-exhausted');
+    const status = document.createElement('span'); status.className = 'key-slot-status';
+    if (isActive)    { status.textContent = '●'; status.style.color = accentColor; }
+    else if (isExhausted) { status.textContent = '✕'; status.style.color = 'var(--danger)'; }
+    else if (slot.key)    { status.textContent = '○'; status.style.color = '#444'; }
+    row.appendChild(num); row.appendChild(inp); row.appendChild(status);
+    container.appendChild(row);
+  }
+}
+function renderKeySlots()     { _renderKeySlots('key-slots',      apiKeys,  activeKeyIndex,     '#00ff88'); }
+function renderGroqKeySlots() { _renderKeySlots('groq-key-slots', groqKeys, activeGroqKeyIndex, '#ff6b35'); }
+
+function openSettings() {
+  document.getElementById('s-model').value = model;
+  document.getElementById('s-groq-model').value = groqModel;
+  document.getElementById('s-system').value = systemPrompt;
+  document.getElementById('s-ollama-host').value = ollamaHost;
+  document.getElementById('s-ollama-model').value = ollamaModel;
+  updateProviderUI();
+  renderKeySlots();
+  renderGroqKeySlots();
+  document.getElementById('settings-overlay').classList.add('open');
+}
+function closeSettingsOutside(e) {
+  if (e.target === document.getElementById('settings-overlay'))
+    document.getElementById('settings-overlay').classList.remove('open');
+}
+function saveSettings() {
+  // Gemini keys
+  const slots = document.querySelectorAll('#key-slots .key-slot input');
+  const newKeys = [];
+  slots.forEach((inp, i) => { const val = inp.value.trim(); if (val) { const prev = apiKeys[i]; newKeys.push({ key: val, exhausted: (prev && prev.key === val) ? prev.exhausted : false }); } });
+  if (activeKeyIndex >= newKeys.length) activeKeyIndex = 0;
+  apiKeys = newKeys;
+
+  // Groq keys
+  const gSlots = document.querySelectorAll('#groq-key-slots .key-slot input');
+  const newGroqKeys = [];
+  gSlots.forEach((inp, i) => { const val = inp.value.trim(); if (val) { const prev = groqKeys[i]; newGroqKeys.push({ key: val, exhausted: (prev && prev.key === val) ? prev.exhausted : false }); } });
+  if (activeGroqKeyIndex >= newGroqKeys.length) activeGroqKeyIndex = 0;
+  groqKeys = newGroqKeys;
+
+  model        = document.getElementById('s-model').value;
+  groqModel    = document.getElementById('s-groq-model').value;
+  ollamaHost   = document.getElementById('s-ollama-host').value.trim() || 'http://localhost:11434';
+  ollamaModel  = document.getElementById('s-ollama-model').value.trim() || 'dolphin3';
+  systemPrompt = document.getElementById('s-system').value.trim();
+
+  saveKeys();
+  localStorage.setItem('gemini_model',  model);
+  localStorage.setItem('groq_model',    groqModel);
+  localStorage.setItem('ollama_host',   ollamaHost);
+  localStorage.setItem('ollama_model',  ollamaModel);
+  localStorage.setItem('gemini_system', systemPrompt);
+
+  document.getElementById('settings-overlay').classList.remove('open');
+  applyMode();
+}
+
+// ── Clear ──────────────────────────────────────────────────
+function clearChat() {
+  history = []; removeImage();
+  document.getElementById('messages').innerHTML = `<div id="empty"><div class="big">⚡</div><strong>Direct answers. No fluff.</strong><span>Ask anything. Code, math, logic, or share an image.</span></div>`;
+}
+
+// ── Copy ───────────────────────────────────────────────────
+function copyToClipboard(text, btn) {
+  const done = () => { if (!btn) return; btn.textContent = 'copied!'; btn.classList.add('copied'); setTimeout(() => { btn.textContent = 'copy'; btn.classList.remove('copied'); }, 1500); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, btn));
+  else fallbackCopy(text, btn);
+}
+function fallbackCopy(text, btn) {
+  const ta = document.createElement('textarea'); ta.value = text;
+  ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';
+  document.body.appendChild(ta); ta.focus(); ta.select();
+  try { document.execCommand('copy'); if (btn) { btn.textContent = 'copied!'; btn.classList.add('copied'); setTimeout(() => { btn.textContent = 'copy'; btn.classList.remove('copied'); }, 1500); } } catch(e) { if (btn) btn.textContent = 'failed'; }
+  document.body.removeChild(ta);
+}
+
+// ── Render ─────────────────────────────────────────────────
+function renderContent(text) {
+  const escape = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const codeBlocks = [];
+  text = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
+    const id = 'cb' + Math.random().toString(36).slice(2);
+    const rawCode = code.trim();
+    const lineCount = rawCode.split('\n').length;
+    const langLabel = lang ? lang.toUpperCase() : 'CODE';
+    const langIcons = { html:'</>',css:'</>',javascript:'JS',js:'JS',python:'PY',py:'PY',java:'J',bash:'$_',sh:'$_',json:'{}',sql:'DB',typescript:'TS',ts:'TS',cpp:'C++',c:'C',rust:'RS',go:'GO',ruby:'RB',php:'PHP',swift:'SW',kotlin:'KT' };
+    const icon = langIcons[lang?.toLowerCase()] || '<>';
+    const highlighted = lang && hljs.getLanguage(lang) ? hljs.highlight(rawCode, { language: lang }).value : escape(rawCode);
+    const block = `<div class="code-card" id="card_${id}" onclick="toggleCodeCard('${id}')">
+  <div class="code-card-header">
+    <div class="code-card-icon">${icon}</div>
+    <div class="code-card-info">
+      <div class="code-card-title">${langLabel} snippet</div>
+      <div class="code-card-meta">Code · ${lineCount} line${lineCount !== 1 ? 's' : ''} — tap to expand</div>
+    </div>
+    <span class="code-card-chevron">▼</span>
+  </div>
+  <pre id="${id}" data-raw="${encodeURIComponent(rawCode)}"><button class="copy-code-btn" onclick="event.stopPropagation();copyCode('${id}')">copy</button><code class="hljs">${highlighted}</code></pre>
+</div>`;
+    codeBlocks.push(block); return `\x00CODE${codeBlocks.length-1}\x00`;
+  });
+  text = text.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  text = text.replace(/`([^`]+)`/g, (_, c) => `<code>${c}</code>`);
+  text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  text = text.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  text = text.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  text = text.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+  text = text.replace(/^- (.+)$/gm, '<li>$1</li>');
+  text = text.replace(/(<li>.*<\/li>\n?)+/g, s => `<ul>${s}</ul>`);
+  text = text.replace(/\n/g, '<br>');
+  text = text.replace(/\x00CODE(\d+)\x00/g, (_, i) => codeBlocks[parseInt(i)]);
+  return text;
+}
+function toggleCodeCard(id) {
+  const card = document.getElementById('card_' + id);
+  const pre  = document.getElementById(id);
+  card.classList.toggle('open');
+  pre.classList.toggle('expanded');
+  // Update meta text
+  const meta = card.querySelector('.code-card-meta');
+  if (card.classList.contains('open')) {
+    meta.textContent = meta.textContent.replace('tap to expand','tap to collapse');
+  } else {
+    meta.textContent = meta.textContent.replace('tap to collapse','tap to expand');
+  }
+}
+function copyCode(id) {
+  const pre = document.getElementById(id); const btn = pre.querySelector('.copy-code-btn');
+  copyToClipboard(decodeURIComponent(pre.dataset.raw || '') || pre.querySelector('code').innerText, btn);
+}
+
+// ── Image ──────────────────────────────────────────────────
+function showAttachOptions() { document.getElementById('attach-overlay').style.display = 'flex'; }
+function closeAttachOptions() { document.getElementById('attach-overlay').style.display = 'none'; }
+function closeAttachOutside(e) { if (e.target === document.getElementById('attach-overlay')) closeAttachOptions(); }
+function openFilePicker() { closeAttachOptions(); document.getElementById('file-input').click(); }
+function handleFileSelect(e) { const f = e.target.files[0]; if (!f) return; readImageFile(f); e.target.value = ''; }
+function readImageFile(file) {
+  const r = new FileReader();
+  r.onload = ev => { const d = ev.target.result; const m = d.split(',')[0].match(/:(.*?);/)[1]; setPendingImage(d.split(',')[1], m, d); };
+  r.readAsDataURL(file);
+}
+function setPendingImage(b64, mime, previewUrl) {
+  pendingImageBase64 = b64; pendingImageMime = mime;
+  document.getElementById('preview-thumb').src = previewUrl || `data:${mime};base64,${b64}`;
+  document.getElementById('image-preview-bar').classList.add('has-image');
+  document.getElementById('attach-btn').classList.add('has-image');
+}
+function removeImage() {
+  pendingImageBase64 = null; pendingImageMime = null;
+  document.getElementById('image-preview-bar').classList.remove('has-image');
+  document.getElementById('attach-btn').classList.remove('has-image');
+  document.getElementById('preview-thumb').src = '';
+}
+
+// ── Camera ─────────────────────────────────────────────────
+async function openCamera() {
+  closeAttachOptions(); document.getElementById('cam-error').textContent = '';
+  document.getElementById('camera-modal').classList.add('open'); await startCameraStream();
+}
+async function startCameraStream() {
+  if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+    document.getElementById('camera-video').srcObject = cameraStream;
+    document.getElementById('cam-error').textContent = '';
+  } catch(err) {
+    let msg = 'Camera access denied.';
+    if (err.name === 'NotFoundError') msg = 'No camera found.';
+    else if (err.name === 'NotAllowedError') msg = 'Camera permission denied.';
+    document.getElementById('cam-error').textContent = msg;
+  }
+}
+function switchCamera() { facingMode = facingMode === 'environment' ? 'user' : 'environment'; startCameraStream(); }
+function snapPhoto() {
+  const v = document.getElementById('camera-video'); const c = document.getElementById('camera-canvas');
+  c.width = v.videoWidth || 640; c.height = v.videoHeight || 480;
+  c.getContext('2d').drawImage(v, 0, 0);
+  const d = c.toDataURL('image/jpeg', 0.9); closeCamera(); setPendingImage(d.split(',')[1], 'image/jpeg', d);
+}
+function closeCamera() {
+  if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
+  document.getElementById('camera-video').srcObject = null;
+  document.getElementById('camera-modal').classList.remove('open');
+}
+
+// ── Add message ────────────────────────────────────────────
+function addMessage(role, content, isThinking = false, imageDataUrl = null) {
+  const empty = document.getElementById('empty'); if (empty) empty.remove();
+  const msgs = document.getElementById('messages');
+  const div = document.createElement('div'); div.className = `msg ${role}`;
+  if (isThinking) div.id = 'thinking-msg';
+  const label = document.createElement('div'); label.className = 'msg-label';
+  // Color label and border by current provider
+  if (role === 'ai') {
+    const pc = PROVIDER_COLORS[provider];
+    label.style.color = pc.color;
+    div.style.borderLeftColor = pc.color;
+    // store on element for thinking dots
+    div.dataset.providerColor = pc.color;
+  }
+  const providerName = role === 'ai' ? (provider === 'gemini' ? 'GEMINI' : provider === 'groq' ? 'GROQ' : 'OLLAMA') : 'YOU';
+  label.textContent = role === 'user' ? 'YOU' : providerName;
+  const contentDiv = document.createElement('div'); contentDiv.className = 'msg-content';
+  if (isThinking) {
+    const pc = PROVIDER_COLORS[provider];
+    contentDiv.innerHTML = `<div class="thinking" style="--dot-color:${pc.color}"><span style="background:${pc.color}"></span><span style="background:${pc.color}"></span><span style="background:${pc.color}"></span></div>`;
+  } else {
+    if (imageDataUrl) { const img = document.createElement('img'); img.src = imageDataUrl; img.className = 'msg-image'; contentDiv.appendChild(img); }
+    const t = document.createElement('div'); t.innerHTML = renderContent(content); contentDiv.appendChild(t);
+  }
+  div.appendChild(label); div.appendChild(contentDiv); msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight; return div;
+}
+
+// ── Send ───────────────────────────────────────────────────
+async function sendMessage() {
+  if (isLoading) {
+    if (abortController) abortController.abort();
+    return;
+  }
+  const input = document.getElementById('input');
+  let text = input.value.trim();
+
+  // Merge pasted content if present
+  if (pastedContent) {
+    text = text ? text + '\n\n' + pastedContent : pastedContent;
+    clearPaste();
+  }
+
+  if (!text && !pendingImageBase64) return;
+
+  if (mode === 'online' && !getActiveKey()) { openSettings(); return; }
+
+  const imageDataUrl = pendingImageBase64 ? `data:${pendingImageMime};base64,${pendingImageBase64}` : null;
+  const imgB64 = pendingImageBase64; const imgMime = pendingImageMime;
+
+  input.value = ''; input.style.height = 'auto'; removeImage();
+  isLoading = true;
+  const sendBtn = document.getElementById('send-btn');
+  sendBtn.disabled = false;
+  sendBtn.classList.add('stop');
+  sendBtn.textContent = '■';
+
+  addMessage('user', text || '(image)', false, imageDataUrl);
+
+  const userParts = [];
+  if (imgB64) userParts.push({ inlineData: { mimeType: imgMime, data: imgB64 } });
+  if (text) userParts.push({ text });
+  if (!text && imgB64) userParts.push({ text: 'What is in this image?' });
+  history.push({ role: 'user', parts: userParts });
+
+  const thinkingEl = addMessage('ai', '', true);
+  abortController = new AbortController();
+
+  if (provider === 'ollama') {
+    await sendOllama(thinkingEl, text, imgB64, imgMime);
+  } else if (provider === 'groq') {
+    await sendGroq(thinkingEl, text);
+  } else {
+    await sendGemini(thinkingEl, imgB64, imgMime);
+  }
+
+  isLoading = false; abortController = null;
+  sendBtn.classList.remove('stop');
+  sendBtn.textContent = '↑';
+  input.focus();
+}
+
+// ── Ollama send ────────────────────────────────────────────
+async function sendOllama(thinkingEl, text, imgB64, imgMime) {
+  try {
+    // Build messages for Ollama (OpenAI-compatible format)
+    const messages = history.map(m => {
+      const content = m.parts.map(p => p.text || '').join('');
+      return { role: m.role === 'model' ? 'assistant' : 'user', content };
+    });
+    if (systemPrompt) messages.unshift({ role: 'system', content: systemPrompt });
+
+    const body = { model: ollamaModel, messages, stream: false };
+
+    const res = await fetch(`${ollamaHost}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: abortController.signal
+    });
+
+    if (!res.ok) {
+      thinkingEl.remove();
+      addMessage('ai', `Ollama error: ${res.status} ${res.statusText}\n\nMake sure Ollama is running:\nOLLAMA_ORIGINS="*" ollama serve`);
+      history.pop(); return;
+    }
+
+    const data = await res.json();
+    thinkingEl.remove();
+    const reply = data.message?.content || 'No response.';
+    history.push({ role: 'model', parts: [{ text: reply }] });
+    addMessage('ai', reply);
+  } catch(err) {
+    thinkingEl.remove();
+    if (err.name !== 'AbortError') {
+      addMessage('ai', `Cannot reach Ollama.\n\nIn Termux, run:\nOLLAMA_ORIGINS="*" ollama serve`);
+      history.pop();
+    }
+  }
+}
+
+// ── Helper: sleep ─────────────────────────────────────────
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// ── No-op: rate limit waits removed — instant key switch ──
+async function sleepWithCountdown(ms, label) {
+  showSwitchToast(label);
+  // No wait — instant failover
+}
+
+// ── Try one Gemini key ─────────────────────────────────────
+// Returns: { ok, reply, rateLimit, keyFail, error }
+async function tryGeminiKey(key, imgB64, imgMime) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+  const body = { contents: [...history], generationConfig: { temperature: 0.7, maxOutputTokens: 65536 } };
+  if (systemPrompt) body.systemInstruction = { parts: [{ text: systemPrompt }] };
+  const res  = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: abortController.signal });
+  const data = await res.json();
+  if (data.error) {
+    const code = data.error.code || 0;
+    if (code === 429) return { rateLimit: true };
+    if (code === 400 || code === 403) return { keyFail: true };
+    return { error: `Gemini error ${code}: ${data.error.message}` };
+  }
+  if (data.candidates?.[0]?.finishReason === 'SAFETY') return { error: 'Response blocked by safety filter.' };
+  const reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!reply || !reply.trim()) return { error: `Gemini returned an empty response. Raw: ${JSON.stringify(data).slice(0, 200)}` };
+  return { ok: true, reply };
+}
+
+// ── Try one Groq key ───────────────────────────────────────
+async function tryGroqKey(key) {
+  const messages = history.map(m => ({ role: m.role === 'model' ? 'assistant' : 'user', content: m.parts.map(p => p.text || '').join('') }));
+  if (systemPrompt) messages.unshift({ role: 'system', content: systemPrompt });
+  const res  = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+    body: JSON.stringify({ model: groqModel, messages, temperature: 0.7, max_tokens: 32768 }),
+    signal: abortController.signal
+  });
+  const data = await res.json();
+  if (!res.ok || data.error) {
+    if (res.status === 429) return { rateLimit: true };
+    if (res.status === 400 || res.status === 401) return { keyFail: true };
+    return { error: `Groq error ${res.status}: ${data.error?.message || 'Unknown'}` };
+  }
+  const reply = data.choices?.[0]?.message?.content;
+  if (!reply || !reply.trim()) return { keyFail: true };
+  return { ok: true, reply };
+}
+
+// ── Show switching toast ───────────────────────────────────
+function showSwitchToast(msg) {
+  const toast = document.getElementById('key-toast');
+  document.getElementById('toast-num').textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2500);
+}
+
+// ── Master send — Gemini → Groq → Ollama cascade ──────────
+// Logic: send → wait for REAL reply → only switch if reply fails/empty/error
+async function sendMessage_cascade(thinkingEl, text, imgB64, imgMime) {
+
+  // ── 1. Try all Gemini keys in order ──
+  const availableGemini = apiKeys.filter(k => k.key);
+  for (let i = 0; i < availableGemini.length; i++) {
+    const keyObj = availableGemini[i];
+    if (keyObj.exhausted) continue;
+
+    activeKeyIndex = apiKeys.indexOf(keyObj);
+    updateKeyIndicator();
+
+    try {
+      // Send and WAIT for actual reply
+      const result = await tryGeminiKey(keyObj.key, imgB64, imgMime);
+
+      if (result.ok) {
+        // ✅ Got a real reply — show it, stop here
+        thinkingEl.remove();
+        history.push({ role: 'model', parts: [{ text: result.reply }] });
+        provider = 'gemini';
+        applyMode();
+        addMessage('ai', result.reply);
+        return;
+      }
+
+      // ❌ Reply came back but was bad — now we rotate
+      if (result.rateLimit || result.keyFail) {
+        keyObj.exhausted = true;
+        saveKeys();
+        const nextAvail = availableGemini.find((k, idx) => idx > i && !k.exhausted);
+        if (nextAvail) {
+          if (result.rateLimit) {
+            await sleepWithCountdown(60000, `Rate limited — switching to Gemini key ${i+2}`);
+          } else {
+            showSwitchToast(`Switching to Gemini key ${i+2}`);
+          }
+          continue;
+        }
+        break; // No more Gemini keys — try Groq
+      }
+
+      if (result.error) {
+        thinkingEl.remove();
+        addMessage('ai', result.error);
+        history.pop();
+        return;
+      }
+    } catch(err) {
+      if (err.name === 'AbortError') { try { thinkingEl.remove(); } catch(e){} return; }
+      continue;
+    }
+  }
+
+  // ── 2. All Gemini keys exhausted — try Groq ──
+  const availableGroq = groqKeys.filter(k => k.key);
+  if (availableGroq.length) {
+    showSwitchToast('Switching to Groq');
+
+    for (let i = 0; i < availableGroq.length; i++) {
+      const keyObj = availableGroq[i];
+      if (keyObj.exhausted) continue;
+
+      activeGroqKeyIndex = groqKeys.indexOf(keyObj);
+      provider = 'groq';
+      applyMode();
+      updateKeyIndicator();
+
+      try {
+        const result = await tryGroqKey(keyObj.key);
+
+        if (result.ok) {
+          // ✅ Groq success
+          thinkingEl.remove();
+          history.push({ role: 'model', parts: [{ text: result.reply }] });
+          addMessage('ai', result.reply);
+          return;
+        }
+
+        if (result.rateLimit || result.keyFail) {
+          keyObj.exhausted = true;
+          saveKeys();
+          const nextAvail = availableGroq.find((k, idx) => idx > i && !k.exhausted);
+          if (nextAvail) {
+            await sleepWithCountdown(60000, `Switching to Groq key ${i+2}`);
+            continue;
+          }
+          break; // Fall through to Ollama
+        }
+
+        if (result.error) {
+          thinkingEl.remove();
+          addMessage('ai', result.error);
+          history.pop();
+          return;
+        }
+      } catch(err) {
+        if (err.name === 'AbortError') { try { thinkingEl.remove(); } catch(e){} return; }
+        continue;
+      }
+    }
+  }
+
+  // ── 3. All API keys exhausted — try Ollama ──
+  showSwitchToast('Switching to Ollama');
+  provider = 'ollama';
+  mode = 'offline';
+  applyMode();
+  updateKeyIndicator();
+  await sendOllama(thinkingEl, text, imgB64, imgMime);
+}
+
+// ── Gemini send (entry point) ──────────────────────────────
+async function sendGemini(thinkingEl, imgB64, imgMime) {
+  await sendMessage_cascade(thinkingEl, '', imgB64, imgMime);
+}
+
+// ── Groq send (entry point — when user manually on Groq) ──
+async function sendGroq(thinkingEl, text) {
+  // When user is manually on Groq, still cascade Groq → Gemini fallback
+  const availableGroq = groqKeys.filter(k => k.key);
+  for (let i = 0; i < availableGroq.length; i++) {
+    const keyObj = availableGroq[i];
+    if (keyObj.exhausted) continue;
+    activeGroqKeyIndex = groqKeys.indexOf(keyObj);
+    updateKeyIndicator();
+    try {
+      const result = await tryGroqKey(keyObj.key);
+      if (result.ok) {
+        thinkingEl.remove();
+        history.push({ role: 'model', parts: [{ text: result.reply }] });
+        addMessage('ai', result.reply);
+        return;
+      }
+      if (result.rateLimit || result.keyFail) {
+        keyObj.exhausted = true; saveKeys();
+        const next = availableGroq.find((k, idx) => idx > i && !k.exhausted);
+        if (next) { await sleepWithCountdown(60000, `Switching to Groq key ${i+2}`); continue; }
+        // Groq all exhausted — fall to Gemini cascade
+        await sleepWithCountdown(60000, 'Switching to Gemini');
+        provider = 'gemini'; mode = 'online'; applyMode();
+        await sendMessage_cascade(thinkingEl, text, null, null);
+        return;
+      }
+      if (result.error) { thinkingEl.remove(); addMessage('ai', result.error); history.pop(); return; }
+    } catch(err) {
+      if (err.name === 'AbortError') { try { thinkingEl.remove(); } catch(e){} return; }
+      continue;
+    }
+  }
+  // No Groq keys at all — fall to Gemini
+  provider = 'gemini'; mode = 'online'; applyMode();
+  await sendMessage_cascade(thinkingEl, text, null, null);
+}
+
+init();
+</script>
+</body>
+</html>
