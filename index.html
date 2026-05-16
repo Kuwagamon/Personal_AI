@@ -1216,11 +1216,37 @@ async function sleepWithCountdown(ms, label) {
   // No wait — instant failover
 }
 
+  // ── Auto summarize old history ─────────────────────────────
+let historySummary = '';
+
+async function summarizeOldHistory(key) {
+  if (history.length < 20) return; // only summarize when history gets long
+  const oldMessages = history.slice(0, -10); // summarize everything except last 10
+  const recent = history.slice(-10); // keep last 10 as-is
+
+  const prompt = `Summarize this conversation history in 3-5 sentences, keeping all important facts, context, and details the user mentioned:\n\n${oldMessages.map(m => `${m.role}: ${m.parts.map(p => p.text||'').join('')}`).join('\n')}`;
+
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }] })
+    });
+    const data = await res.json();
+    const summary = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (summary) {
+      historySummary = summary;
+      history = recent; // trim history to last 10 only
+    }
+  } catch(e) {}
+}
 // ── Try one Gemini key ─────────────────────────────────────
 // Returns: { ok, reply, rateLimit, keyFail, error }
 async function tryGeminiKey(key, imgB64, imgMime) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
-  const body = { contents: [...history], generationConfig: { temperature: 0.7, maxOutputTokens: 65536 } };
+  const summaryPrefix = historySummary ? [{ role: 'user', parts: [{ text: `[Previous conversation summary: ${historySummary}]` }] }, { role: 'model', parts: [{ text: 'Understood, I have context from our previous conversation.' }] }] : [];
+  const body = { contents: [...summaryPrefix, ...history], generationConfig: { temperature: 0.7, maxOutputTokens: 8192 } };
   if (systemPrompt) body.systemInstruction = { parts: [{ text: systemPrompt }] };
   const res  = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: abortController.signal });
   const data = await res.json();
@@ -1379,6 +1405,8 @@ async function sendMessage_cascade(thinkingEl, text, imgB64, imgMime) {
 
 // ── Gemini send (entry point) ──────────────────────────────
 async function sendGemini(thinkingEl, imgB64, imgMime) {
+  const key = getActiveKey();
+  if (key) await summarizeOldHistory(key);
   await sendMessage_cascade(thinkingEl, '', imgB64, imgMime);
 }
 
