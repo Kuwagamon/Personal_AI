@@ -575,7 +575,9 @@
     <textarea id="input" placeholder="Chat with AI..." rows="1"></textarea>
     <div id="input-bottom-row">
       <button class="attach-btn" id="attach-btn" onclick="showAttachOptions()" title="Attach image">＋</button>
+      <button class="attach-btn" id="mic-btn" onclick="toggleMic()" title="Voice input">🎤</button>
       <button id="send-btn" onclick="sendMessage()">↑</button>
+</div>
     </div>
   </div>
 </div>
@@ -824,6 +826,40 @@ let pastedContent = null; // stores the pasted long text separately
 function clearPaste() {
   pastedContent = null;
   document.getElementById('paste-card').classList.remove('visible');
+}
+
+// ── Voice Input ────────────────────────────────────────────
+let recognition = null;
+let isListening = false;
+
+function toggleMic() {
+  if (isListening) {
+    recognition.stop();
+    return;
+  }
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) { alert('Voice input not supported on this browser.'); return; }
+  recognition = new SpeechRecognition();
+  recognition.lang = 'en-US';
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  recognition.onstart = () => {
+    isListening = true;
+    document.getElementById('mic-btn').textContent = '🔴';
+  };
+  recognition.onresult = e => {
+    const transcript = e.results[0][0].transcript;
+    document.getElementById('input').value = transcript;
+  };
+  recognition.onend = () => {
+    isListening = false;
+    document.getElementById('mic-btn').textContent = '🎤';
+  };
+  recognition.onerror = () => {
+    isListening = false;
+    document.getElementById('mic-btn').textContent = '🎤';
+  };
+  recognition.start();
 }
 
 // ── Init ───────────────────────────────────────────────────
